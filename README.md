@@ -16,4 +16,4 @@ To compile (Linux/macOS/Windows with GCC):
 To run:
     ./udaan
 
-Author: Mohit Thakur & Team (AEROSTRUCTS)
+Author:  Team (AEROSTRUCTS)
