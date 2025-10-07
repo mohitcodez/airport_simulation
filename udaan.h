@@ -4,7 +4,7 @@
 #define MAX_FLIGHTS 100
 #define MAX_QUEUE 50
 
-// ------------------ STRUCTURES ------------------
+// STRUCTURES 
 struct Flight {
     int flightID;
     char destination[30];
