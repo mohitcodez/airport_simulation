@@ -56,6 +56,45 @@ void displayQueue(struct Queue *q) {
         i = (i + 1) % MAX_QUEUE;
     }
 }
+void scheduleFlights(struct Queue *landing, struct Queue *takeoff, struct Flight f, int type) {
+    if (type == 1) {
+        strcpy(f.status, "Waiting to Land");
+        enqueue(landing, f);
+        printf("Flight %d added to Landing Queue.\n", f.flightID);
+    } else {
+        strcpy(f.status, "Waiting for Takeoff");
+        enqueue(takeoff, f);
+        printf("Flight %d added to Takeoff Queue.\n", f.flightID);
+    }
+}
+
+void allocateRunway(struct Queue *landing, struct Queue *takeoff) {
+    printf("\n--- Runway Allocation ---\n");
+    if (!isQueueEmpty(landing)) {
+        struct Flight f = dequeue(landing);
+        printf("Flight %d landing completed.\n", f.flightID);
+    } else if (!isQueueEmpty(takeoff)) {
+        struct Flight f = dequeue(takeoff);
+        printf("Flight %d takeoff completed.\n", f.flightID);
+    } else {
+        printf("No flights waiting for runway.\n");
+    }
+}
+
+void handleEmergency(struct Stack *emergency, struct Queue *landing) {
+    if (isEmpty(emergency)) {
+        printf("No emergency flights!\n");
+        return;
+    }
+    struct Flight f = pop(emergency);
+    printf("Emergency Flight %d landing immediately!\n", f.flightID);
+    enqueue(landing, f);
+}
+
+void handleDelay(struct Flight *f) {
+    printf("Flight %d delayed due to weather.\n", f->flightID);
+    strcpy(f->status, "Delayed");
+}
 
 
 
