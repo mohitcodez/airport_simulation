@@ -2,7 +2,7 @@
 #include <string.h>
 #include "udaan.h"
 
-void addFlight(struct FlightDB* db, struct Flight f) {
+void addFlight(struct FlightDB *db, struct Flight f) {
     if (db->count >= MAX_FLIGHTS) {
         printf("Database full!\n");
         return;
@@ -11,7 +11,7 @@ void addFlight(struct FlightDB* db, struct Flight f) {
     db->count++;
 }
 
-void removeFlight(struct FlightDB* db, int id) {
+void removeFlight(struct FlightDB *db, int id) {
     int found = 0;
     for (int i = 0; i < db->count; i++) {
         if (db->flights[i].flightID == id) {
@@ -29,7 +29,7 @@ void removeFlight(struct FlightDB* db, int id) {
         printf("Flight not found!\n");
 }
 
-void displayFlights(struct FlightDB* db) {
+void displayFlights(struct FlightDB *db) {
     printf("\n--- Current Flights ---\n");
     if (db->count == 0) {
         printf("No flights available.\n");
@@ -38,6 +38,6 @@ void displayFlights(struct FlightDB* db) {
     for (int i = 0; i < db->count; i++) {
         struct Flight f = db->flights[i];
         printf("ID: %d | To: %s | Status: %s | Fuel: %d%% | Priority: %d\n",
-            f.flightID, f.destination, f.status, f.fuelLevel, f.priority);
+               f.flightID, f.destination, f.status, f.fuelLevel, f.priority);
     }
 }
