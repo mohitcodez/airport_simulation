@@ -1,26 +1,28 @@
 #ifndef FLIGHT_H
 #define FLIGHT_H
 
-#include <time.h>
-
-// Flight structure definition
-typedef struct Flight {
-    int flight_id;
-    char airline_name[50];
-    char source[50];
-    char destination[50];
-    char departure_time[20];
-    char arrival_time[20];
-    struct Flight* next;
+typedef struct {
+    int id;
+    char airline[32];
+    char source[32];
+    char destination[32];
+    char departure[16];
+    char arrival[16];
 } Flight;
 
-// Function declarations for flight operations
-int generate_flight_id(void);
-Flight* create_flight(void);
-void display_flight(const Flight* flight);
-void search_flight_by_id(const Flight* head, int id);
-void search_flight_by_destination(const Flight* head, const char* destination);
-Flight* delete_flight(Flight* head, int id);
-void display_all_flights(const Flight* head);
+typedef struct FlightNode {
+    Flight flight;
+    struct FlightNode *next;
+} FlightNode;
+
+// Basic operations
+Flight inputFlight();
+void addFlight(FlightNode **head, Flight flight);
+FlightNode* searchFlightByID(FlightNode *head, int id);
+void searchFlightByDestination(FlightNode *head, const char *destination);
+int deleteFlight(FlightNode **head, int id);
+void printFlight(const Flight *flight);
+void printAllFlights(FlightNode *head);
+void freeFlights(FlightNode *head);
 
 #endif

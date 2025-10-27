@@ -1,20 +1,41 @@
+# Flight Management System
 
-Udaan Track - Airport Runway & Flight Control System
-----------------------------------------------------
+## Features
 
-Modules included:
-- flight.c     -> Flight database (array)
-- bst.c        -> Binary Search Tree search
-- stack.c      -> Emergency/History handling
-- history.c    -> Departure history log
-- scheduler.c  -> Landing/Takeoff queues
-- udaan.h      -> Header file
-- main.c       -> Menu-driven program
+- Add Flight (with random unique ID)
+- Search Flight (by ID or destination)
+- Delete Flight
+- Emergency Landing (LIFO stack)
+- List all flights
+- Data persists in flights.txt
 
-To compile (Linux/macOS/Windows with GCC):
-    gcc main.c flight.c bst.c stack.c history.c scheduler.c -o udaan
+## Compilation
 
-To run:
-    ./udaan
+### Linux (gcc) or Windows (MinGW)
 
-Author:  Team (AEROSTRUCTS)
+To compile and run:
+
+```sh
+make
+./flight_system     # Linux
+flight_system.exe   # Windows (MinGW)
+```
+
+Or manually:
+```sh
+gcc -Wall -g -o flight_system main.c flight.c stack_queue.c fileio.c
+```
+
+## Usage
+
+Run the executable and follow the menu.
+
+- Flights are stored in `flights.txt` (created automatically).
+- Emergency landings use a stack (LIFO): push by flight ID, pop to simulate landing.
+
+## Cleaning Up
+
+To remove compiled files:
+```sh
+make clean
+```

@@ -1,109 +1,126 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <string.h>
 #include "flight.h"
 #include "stack_queue.h"
 #include "fileio.h"
 
-#define FLIGHTS_FILE "flights.txt"
+#define DATAFILE "flights.txt"
 
-void display_menu(void) {
-    printf("\nFlight Management System\n");
-    printf("1. Add Flight\n");
-    printf("2. Search Flight by ID\n");
-    printf("3. Search Flight by Destination\n");
-    printf("4. Delete Flight\n");
-    printf("5. Emergency Landing (Push)\n");
-    printf("6. Process Emergency Landing (Pop)\n");
-    printf("7. Display All Flights\n");
-    printf("8. Display Emergency Stack\n");
-    printf("9. Display Flight Queue\n");
-    printf("10. Save and Exit\n");
-    printf("Enter your choice: ");
-}
+void menu();
 
-int main(void) {
-    Flight* flight_list = load_flights_from_file(FLIGHTS_FILE);
-    EmergencyStack emergency_stack;
-    FlightQueue normal_queue;
-    int choice, flight_id;
-    char destination[50];
-    
-    init_emergency_stack(&emergency_stack);
-    init_flight_queue(&normal_queue);
-    srand((unsigned int)time(NULL));
-    
+int main() {
+    FlightNode *head = NULL;
+    Stack emergencyStack;
+    initStack(&emergencyStack);
+
+    loadFlights(&head, DATAFILE);
+
+    int choice;
     do {
-        display_menu();
+        menu();
+        printf("Enter your choice: ");
         scanf("%d", &choice);
-        
+        getchar(); // flush newline
+
         switch (choice) {
             case 1: {
-                Flight* new_flight = create_flight();
-                if (new_flight) {
-                    enqueue_flight(&normal_queue, new_flight);
-                    new_flight->next = flight_list;
-                    flight_list = new_flight;
+                Flight flight = inputFlight();
+                addFlight(&head, flight);
+                printf("Flight added successfully! ID: %d\n", flight.id);
+                break;
+            }
+            case 2: {
+                int searchChoice;
+                printf("Search by:\n1. Flight ID\n2. Destination\nChoice: ");
+                scanf("%d", &searchChoice);
+                getchar();
+                if (searchChoice == 1) {
+                    int id;
+                    printf("Enter Flight ID: ");
+                    scanf("%d", &id);
+                    getchar();
+                    FlightNode *found = searchFlightByID(head, id);
+                    if (found) {
+                        printFlight(&(found->flight));
+                    } else {
+                        printf("Flight not found.\n");
+                    }
+                } else {
+                    char dest[32];
+                    printf("Enter Destination: ");
+                    fgets(dest, sizeof(dest), stdin);
+                    dest[strcspn(dest, "\n")] = 0;
+                    searchFlightByDestination(head, dest);
                 }
                 break;
             }
-            case 2:
-                printf("Enter Flight ID: ");
-                scanf("%d", &flight_id);
-                search_flight_by_id(flight_list, flight_id);
-                break;
-            case 3:
-                printf("Enter Destination: ");
-                scanf(" %[^\n]s", destination);
-                search_flight_by_destination(flight_list, destination);
-                break;
-            case 4:
+            case 3: {
+                int id;
                 printf("Enter Flight ID to delete: ");
-                scanf("%d", &flight_id);
-                flight_list = delete_flight(flight_list, flight_id);
+                scanf("%d", &id);
+                getchar();
+                if (deleteFlight(&head, id)) {
+                    printf("Flight deleted.\n");
+                } else {
+                    printf("Flight not found.\n");
+                }
                 break;
-            case 5: {
+            }
+            case 4: {
+                int id;
                 printf("Enter Flight ID for emergency landing: ");
-                scanf("%d", &flight_id);
-                Flight* emergency_flight = create_flight();
-                if (emergency_flight) {
-                    push_emergency(&emergency_stack, emergency_flight);
+                scanf("%d", &id);
+                FlightNode *found = searchFlightByID(head, id);
+                if (found) {
+                    pushStack(&emergencyStack, id);
+                    printf("Flight %d pushed to emergency stack.\n", id);
+                } else {
+                    printf("No flight found with ID %d.\n", id);
+                }
+                break;
+            }
+            case 5: {
+                int id = popStack(&emergencyStack);
+                if (id == -1) {
+                    printf("No emergency flights in stack.\n");
+                } else {
+                    printf("Emergency landing performed for Flight ID: %d\n", id);
                 }
                 break;
             }
             case 6: {
-                Flight* processed = pop_emergency(&emergency_stack);
-                if (processed) {
-                    printf("Emergency landing processed for flight %d\n", 
-                           processed->flight_id);
-                    free(processed);
-                }
+                printf("Emergency Stack:\n");
+                printStack(&emergencyStack);
                 break;
             }
-            case 7:
-                display_all_flights(flight_list);
+            case 7: {
+                printf("All Flights:\n");
+                printAllFlights(head);
                 break;
-            case 8:
-                display_emergency_stack(&emergency_stack);
+            }
+            case 0: {
+                saveFlights(head, DATAFILE);
+                freeFlights(head);
+                printf("Exiting. Data saved.\n");
                 break;
-            case 9:
-                display_flight_queue(&normal_queue);
-                break;
-            case 10:
-                save_flights_to_file(flight_list, FLIGHTS_FILE);
-                printf("Flights saved. Exiting...\n");
-                break;
+            }
             default:
-                printf("Invalid choice! Please try again.\n");
+                printf("Invalid choice. Try again.\n");
         }
-    } while (choice != 10);
-    
-    // Cleanup
-    while (flight_list != NULL) {
-        Flight* temp = flight_list;
-        flight_list = flight_list->next;
-        free(temp);
-    }
-    
+    } while (choice != 0);
+
     return 0;
+}
+
+void menu() {
+    printf("\n=== Flight Management System ===\n");
+    printf("1. Add Flight\n");
+    printf("2. Search Flight\n");
+    printf("3. Delete Flight\n");
+    printf("4. Emergency Landing (Push to stack)\n");
+    printf("5. Perform Emergency Landing (Pop from stack)\n");
+    printf("6. Show Emergency Stack\n");
+    printf("7. List All Flights\n");
+    printf("0. Exit\n");
 }

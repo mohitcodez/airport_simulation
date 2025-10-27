@@ -1,0 +1,24 @@
+CC=gcc
+CFLAGS=-Wall -g
+
+OBJS=main.o flight.o stack_queue.o fileio.o
+
+all: flight_system
+
+flight_system: $(OBJS)
+	$(CC) $(CFLAGS) -o flight_system $(OBJS)
+
+main.o: main.c flight.h stack_queue.h fileio.h
+	$(CC) $(CFLAGS) -c main.c
+
+flight.o: flight.c flight.h
+	$(CC) $(CFLAGS) -c flight.c
+
+stack_queue.o: stack_queue.c stack_queue.h
+	$(CC) $(CFLAGS) -c stack_queue.c
+
+fileio.o: fileio.c fileio.h flight.h
+	$(CC) $(CFLAGS) -c fileio.c
+
+clean:
+	rm -f *.o flight_system

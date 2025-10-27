@@ -1,29 +1,17 @@
 #ifndef STACK_QUEUE_H
 #define STACK_QUEUE_H
 
-#include "flight.h"
+#define STACK_SIZE 50
 
-// Stack for emergency landings
 typedef struct {
-    Flight* top;
-} EmergencyStack;
+    int data[STACK_SIZE];
+    int top;
+} Stack;
 
-// Queue for normal flights
-typedef struct {
-    Flight* front;
-    Flight* rear;
-} FlightQueue;
-
-// Stack operations
-void init_emergency_stack(EmergencyStack* stack);
-void push_emergency(EmergencyStack* stack, Flight* flight);
-Flight* pop_emergency(EmergencyStack* stack);
-void display_emergency_stack(const EmergencyStack* stack);
-
-// Queue operations
-void init_flight_queue(FlightQueue* queue);
-void enqueue_flight(FlightQueue* queue, Flight* flight);
-Flight* dequeue_flight(FlightQueue* queue);
-void display_flight_queue(const FlightQueue* queue);
+// Stack Operations
+void initStack(Stack *stack);
+int pushStack(Stack *stack, int flightID);
+int popStack(Stack *stack);
+void printStack(const Stack *stack);
 
 #endif
