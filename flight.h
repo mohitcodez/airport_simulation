@@ -1,6 +1,8 @@
 #ifndef FLIGHT_H
 #define FLIGHT_H
 
+#include <stddef.h>
+
 typedef struct {
     int id;
     char airline[32];
@@ -15,8 +17,8 @@ typedef struct FlightNode {
     struct FlightNode *next;
 } FlightNode;
 
-// Basic operations
-Flight inputFlight();
+/* Basic operations */
+Flight inputFlight(void);
 void addFlight(FlightNode **head, Flight flight);
 FlightNode* searchFlightByID(FlightNode *head, int id);
 void searchFlightByDestination(FlightNode *head, const char *destination);
@@ -24,5 +26,9 @@ int deleteFlight(FlightNode **head, int id);
 void printFlight(const Flight *flight);
 void printAllFlights(FlightNode *head);
 void freeFlights(FlightNode *head);
+
+/* ID helpers */
+int isIDUnique(FlightNode *head, int id);
+int getUniqueID(FlightNode *head);
 
 #endif

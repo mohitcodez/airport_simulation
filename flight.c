@@ -1,24 +1,38 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include "flight.h"
 
-static int generateUniqueID() {
-    return rand() % 90000 + 10000; // 5-digit random
+/* Sequential ID counter:
+ * - nextID is initialized on first call to getUniqueID by scanning the existing list
+ *   and setting nextID = maxExistingID + 1 (or 1 if list empty).
+ * - Each call returns nextID++.
+ */
+int getUniqueID(FlightNode *head) {
+    static int nextID = 0;
+    if (nextID == 0) {
+        int max = 0;
+        FlightNode *cur = head;
+        while (cur) {
+            if (cur->flight.id > max) max = cur->flight.id;
+            cur = cur->next;
+        }
+        nextID = (max >= 1) ? (max + 1) : 1;
+    }
+    return nextID++;
 }
 
-Flight inputFlight() {
+Flight inputFlight(void) {
     Flight flight;
-    srand((unsigned int)time(NULL) + rand());
-    flight.id = generateUniqueID();
+    /* ID assigned by caller (main) using getUniqueID */
+    flight.id = 0;
     printf("Enter Airline Name: ");
     fgets(flight.airline, sizeof(flight.airline), stdin);
     flight.airline[strcspn(flight.airline, "\n")] = 0;
-    printf("Enter Source: ");
+    printf("Enter Source (airport name): ");
     fgets(flight.source, sizeof(flight.source), stdin);
     flight.source[strcspn(flight.source, "\n")] = 0;
-    printf("Enter Destination: ");
+    printf("Enter Destination (airport name): ");
     fgets(flight.destination, sizeof(flight.destination), stdin);
     flight.destination[strcspn(flight.destination, "\n")] = 0;
     printf("Enter Departure Time (HH:MM): ");
@@ -31,74 +45,76 @@ Flight inputFlight() {
 }
 
 void addFlight(FlightNode **head, Flight flight) {
-    FlightNode *newNode = (FlightNode*)malloc(sizeof(FlightNode));
-    newNode->flight = flight;
-    newNode->next = *head;
-    *head = newNode;
+    FlightNode *node = (FlightNode*)malloc(sizeof(FlightNode));
+    if (!node) {
+        fprintf(stderr, "Memory allocation failed while adding flight.\n");
+        return;
+    }
+    node->flight = flight;
+    node->next = *head;
+    *head = node;
 }
 
 FlightNode* searchFlightByID(FlightNode *head, int id) {
-    FlightNode *curr = head;
-    while (curr) {
-        if (curr->flight.id == id)
-            return curr;
-        curr = curr->next;
+    FlightNode *cur = head;
+    while (cur) {
+        if (cur->flight.id == id) return cur;
+        cur = cur->next;
     }
     return NULL;
 }
 
 void searchFlightByDestination(FlightNode *head, const char *destination) {
     int found = 0;
-    FlightNode *curr = head;
-    while (curr) {
-        if (strcmp(curr->flight.destination, destination) == 0) {
-            printFlight(&(curr->flight));
+    FlightNode *cur = head;
+    while (cur) {
+        if (strcmp(cur->flight.destination, destination) == 0) {
+            printFlight(&(cur->flight));
             found = 1;
         }
-        curr = curr->next;
+        cur = cur->next;
     }
-    if (!found)
-        printf("No flights found to destination: %s\n", destination);
+    if (!found) printf("No flights found to destination: %s\n", destination);
 }
 
 int deleteFlight(FlightNode **head, int id) {
-    FlightNode *curr = *head, *prev = NULL;
-    while (curr) {
-        if (curr->flight.id == id) {
-            if (prev) prev->next = curr->next;
-            else *head = curr->next;
-            free(curr);
+    FlightNode *cur = *head, *prev = NULL;
+    while (cur) {
+        if (cur->flight.id == id) {
+            if (prev) prev->next = cur->next;
+            else *head = cur->next;
+            free(cur);
             return 1;
         }
-        prev = curr;
-        curr = curr->next;
+        prev = cur;
+        cur = cur->next;
     }
     return 0;
 }
 
 void printFlight(const Flight *flight) {
-    printf("ID: %d | Airline: %s | Src: %s | Dest: %s | Dep: %s | Arr: %s\n",
+    printf("ID: %d | Airline: %s | %s -> %s | Dep: %s | Arr: %s\n",
            flight->id, flight->airline, flight->source, flight->destination,
            flight->departure, flight->arrival);
 }
 
 void printAllFlights(FlightNode *head) {
-    FlightNode *curr = head;
-    if (!curr) {
+    if (!head) {
         printf("No flights available.\n");
         return;
     }
-    while (curr) {
-        printFlight(&(curr->flight));
-        curr = curr->next;
+    FlightNode *cur = head;
+    while (cur) {
+        printFlight(&(cur->flight));
+        cur = cur->next;
     }
 }
 
 void freeFlights(FlightNode *head) {
-    FlightNode *curr = head;
-    while (curr) {
-        FlightNode *tmp = curr;
-        curr = curr->next;
+    FlightNode *cur = head;
+    while (cur) {
+        FlightNode *tmp = cur;
+        cur = cur->next;
         free(tmp);
     }
 }

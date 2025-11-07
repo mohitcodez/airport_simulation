@@ -1,1 +1,2 @@
-10823,airline,dehradun,goa,1600,0400
+1,flying emirates,goa,kerela,1300,0800
+2,indigo,goa,rajasthan,1200,0100

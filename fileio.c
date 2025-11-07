@@ -6,15 +6,19 @@
 void saveFlights(FlightNode *head, const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) {
-        printf("Error saving flights.\n");
+        printf("Error opening file for saving: %s\n", filename);
         return;
     }
-    FlightNode *curr = head;
-    while (curr) {
-        fprintf(fp, "%d,%s,%s,%s,%s,%s\n", curr->flight.id, curr->flight.airline,
-                curr->flight.source, curr->flight.destination,
-                curr->flight.departure, curr->flight.arrival);
-        curr = curr->next;
+    FlightNode *cur = head;
+    while (cur) {
+        fprintf(fp, "%d,%s,%s,%s,%s,%s\n",
+                cur->flight.id,
+                cur->flight.airline,
+                cur->flight.source,
+                cur->flight.destination,
+                cur->flight.departure,
+                cur->flight.arrival);
+        cur = cur->next;
     }
     fclose(fp);
 }
@@ -22,7 +26,7 @@ void saveFlights(FlightNode *head, const char *filename) {
 void loadFlights(FlightNode **head, const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) return;
-    char line[256];
+    char line[512];
     while (fgets(line, sizeof(line), fp)) {
         Flight flight;
         char *token = strtok(line, ",");
