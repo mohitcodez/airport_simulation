@@ -1,4 +1,4 @@
-# Flight Management System — Phase 3
+# Flight Management System 
 A small education-focused Flight Management System that demonstrates classic data structures (linked list, stack, queue, binary search tree, graph) in a practical application. The core system is implemented in C (console application) and a convenient Python/Tkinter GUI frontend is included that reads/writes the same `flights.txt` persistence file.
 
 This repository is intended for teaching and demonstration: it's easy to explain to faculty, shows how different data structures work together, and includes a useful feature (itinerary finder using a graph + BFS).
