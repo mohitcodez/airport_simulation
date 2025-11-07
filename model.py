@@ -1,16 +1,5 @@
-"""
-model.py
-Python-side model for Flight Management System.
-
-This file implements:
-- Flight dataclass
-- FlightManager: loads/saves flights.txt (CSV), manages flights list (linked-list semantics via Python list)
-- Stack (emergency), Queue (boarding) implementations
-- BST index (TreeNode) built from flights (references Flight objects)
-- Graph builder (airports adjacency) and BFS itinerary finder
-
-The GUI (gui.py) imports this module to operate on flights.txt and in-memory data.
-"""
+# model.py
+# (Updated: dequeue_boarding now deletes the flight from the flights list when boarded)
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Tuple
@@ -114,7 +103,7 @@ class FlightManager:
                     departure=row[4],
                     arrival=row[5]
                 )
-                # prepend to mimic C linked-list insertion order (optional)
+                # append to keep chronological order
                 self.flights.append(flight)
 
     def save(self):
@@ -140,7 +129,6 @@ class FlightManager:
         fid = self._next_id()
         flight = Flight(id=fid, airline=airline.strip(), source=source.strip(), destination=destination.strip(),
                         departure=departure.strip(), arrival=arrival.strip())
-        # prepend to mimic original C behavior (head insert). Using append keeps chronological order.
         self.flights.append(flight)
         # update indices
         self._insert_into_tree(flight)
@@ -187,7 +175,17 @@ class FlightManager:
         return self.boarding_queue.enqueue(fid)
 
     def dequeue_boarding(self) -> Optional[int]:
-        return self.boarding_queue.dequeue()
+        """
+        Dequeue a flight ID from the boarding queue and remove the corresponding flight
+        from the flights list (i.e., it has boarded and is removed from schedule).
+        Returns the dequeued flight ID or None if queue empty.
+        """
+        fid = self.boarding_queue.dequeue()
+        if fid is None:
+            return None
+        # Attempt to remove the flight from schedule
+        self.delete_flight(fid)  # delete_flight rebuilds indices and saves
+        return fid
 
     def list_boarding_queue(self) -> List[int]:
         return self.boarding_queue.as_list()
@@ -259,16 +257,14 @@ class FlightManager:
         if src not in self.graph_adj or dest not in self.graph_adj:
             return None
 
-        # BFS queue of (airport_name)
         from collections import deque
         q = deque()
         q.append(src)
 
-        # visited and parent maps
         visited = {src: True}
         parent_airport: Dict[str, Optional[str]] = {src: None}
         parent_flight: Dict[str, Optional[Flight]] = {src: None}
-        depth = {src: 0}  # number of airport hops from source
+        depth = {src: 0}
 
         found = False
         while q:
@@ -277,7 +273,6 @@ class FlightManager:
             if airport == dest:
                 found = True
                 break
-            # depth cutoff: allow up to max_stops intermediate stops => max airports depth = max_stops + 1
             if d >= max_stops + 1:
                 continue
             for flight in self.graph_adj.get(airport, []):
@@ -291,7 +286,6 @@ class FlightManager:
         if not found:
             return None
 
-        # reconstruct path from dest to src
         legs: List[Flight] = []
         cur = dest
         while parent_airport[cur] is not None:
@@ -315,7 +309,6 @@ class FlightManager:
         self._rebuild_indices()
         self.save()
 
-    # For convenience, reload from disk (in case external edits occurred)
     def reload_from_disk(self):
         self._load()
         self._rebuild_indices()
