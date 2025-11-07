@@ -1,29 +1,12 @@
-"""
-gui.py
-Tkinter-based GUI front-end for the Flight Management System.
-
-Usage:
-    python gui.py
-
-The GUI operates on the same flights.txt used by the C program. Changes made in GUI
-are saved to flights.txt so the C program sees them on the next run.
-
-Features exposed in GUI:
-- List all flights
-- Add flight (IDs auto-increment starting at 1)
-- Search by ID / Destination
-- Delete flight
-- Emergency stack push/pop & view
-- Boarding queue enqueue/dequeue & view
-- Show flights sorted by ID (BST inorder)
-- Find itinerary (graph BFS): source, destination, max stops
-"""
+# gui.py
+# Improved alignment and layout using ttk.Treeview and grid geometry.
+# The GUI still uses model.FlightManager (fm) for data operations.
 
 import tkinter as tk
 from tkinter import ttk, messagebox
 from model import FlightManager, Flight
 
-# Create a single FlightManager instance used by the GUI
+# Single FlightManager instance used by the GUI
 fm = FlightManager()
 
 
@@ -31,143 +14,189 @@ class FlightApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Flight Management System (GUI)")
-        self.geometry("900x600")
+        self.geometry("1000x700")
         self.create_widgets()
         self.refresh_all_lists()
 
     def create_widgets(self):
-        # Left frame: flight list and actions
-        left = ttk.Frame(self)
-        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=8, pady=8)
+        # Configure main grid
+        self.columnconfigure(0, weight=1)   # left column (list)
+        self.columnconfigure(1, weight=0)   # middle spacer
+        self.columnconfigure(2, weight=1)   # right column (forms)
+        self.rowconfigure(0, weight=1)
+        self.rowconfigure(1, weight=0)
 
-        # Flights list
-        lbl = ttk.Label(left, text="All Flights")
-        lbl.pack(anchor=tk.W)
-        self.flight_listbox = tk.Listbox(left, height=15)
-        self.flight_listbox.pack(fill=tk.BOTH, expand=True)
-        self.flight_listbox.bind("<<ListboxSelect>>", self.on_flight_select)
+        # ---------- Left pane: flights table ----------
+        left_frame = ttk.Frame(self, padding=(8, 8))
+        left_frame.grid(row=0, column=0, sticky="nsew")
 
-        # Action buttons under flights
-        btn_frame = ttk.Frame(left)
-        btn_frame.pack(fill=tk.X, pady=4)
-        ttk.Button(btn_frame, text="Refresh", command=self.refresh_all_lists).pack(side=tk.LEFT)
-        ttk.Button(btn_frame, text="Show Sorted (Tree)", command=self.show_sorted).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btn_frame, text="Rebuild Index", command=self.rebuild_indices).pack(side=tk.LEFT)
+        lbl = ttk.Label(left_frame, text="All Flights", font=("Segoe UI", 11, "bold"))
+        lbl.grid(row=0, column=0, sticky="w")
 
-        # Right frame: forms and other structures
-        right = ttk.Frame(self)
-        right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=8, pady=8)
+        # Treeview for flights (better alignment than Listbox)
+        columns = ("id", "airline", "source", "destination", "departure", "arrival")
+        self.flight_tree = ttk.Treeview(left_frame, columns=columns, show="headings", selectmode="browse", height=20)
+        self.flight_tree.grid(row=1, column=0, sticky="nsew", pady=(6, 6))
+        # Configure headings
+        self.flight_tree.heading("id", text="ID")
+        self.flight_tree.heading("airline", text="Airline")
+        self.flight_tree.heading("source", text="Source")
+        self.flight_tree.heading("destination", text="Destination")
+        self.flight_tree.heading("departure", text="Dep")
+        self.flight_tree.heading("arrival", text="Arr")
+        # Column widths
+        self.flight_tree.column("id", width=60, anchor="center")
+        self.flight_tree.column("airline", width=140, anchor="w")
+        self.flight_tree.column("source", width=100, anchor="w")
+        self.flight_tree.column("destination", width=100, anchor="w")
+        self.flight_tree.column("departure", width=70, anchor="center")
+        self.flight_tree.column("arrival", width=70, anchor="center")
+        self.flight_tree.bind("<<TreeviewSelect>>", self.on_flight_select)
 
-        # Add flight form
-        add_frame = ttk.LabelFrame(right, text="Add Flight")
-        add_frame.pack(fill=tk.X, pady=4)
-        self.add_airline = tk.Entry(add_frame)
-        self.add_source = tk.Entry(add_frame)
-        self.add_dest = tk.Entry(add_frame)
-        self.add_dep = tk.Entry(add_frame)
-        self.add_arr = tk.Entry(add_frame)
-        rows = [
-            ("Airline:", self.add_airline),
-            ("Source:", self.add_source),
-            ("Destination:", self.add_dest),
-            ("Departure (HH:MM):", self.add_dep),
-            ("Arrival (HH:MM):", self.add_arr),
-        ]
-        for label_text, widget in rows:
-            row = ttk.Frame(add_frame)
-            row.pack(fill=tk.X, pady=2)
-            ttk.Label(row, text=label_text, width=20).pack(side=tk.LEFT)
-            widget.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        # Left frame configuration
+        left_frame.rowconfigure(1, weight=1)
+        left_frame.columnconfigure(0, weight=1)
 
-        ttk.Button(add_frame, text="Add Flight", command=self.add_flight).pack(pady=6)
+        # Quick action buttons under the tree
+        left_btn_frame = ttk.Frame(left_frame)
+        left_btn_frame.grid(row=2, column=0, sticky="ew", pady=(6, 0))
+        left_btn_frame.columnconfigure((0, 1, 2), weight=1)
+        ttk.Button(left_btn_frame, text="Refresh", command=self.refresh_all_lists).grid(row=0, column=0, sticky="ew", padx=4)
+        ttk.Button(left_btn_frame, text="Show Sorted (Tree)", command=self.show_sorted).grid(row=0, column=1, sticky="ew", padx=4)
+        ttk.Button(left_btn_frame, text="Save Now", command=lambda: (fm.save(), self.log("Saved flights to disk."))).grid(row=0, column=2, sticky="ew", padx=4)
 
-        # Search / Delete
-        sd_frame = ttk.LabelFrame(right, text="Search / Delete")
-        sd_frame.pack(fill=tk.X, pady=4)
-        srow = ttk.Frame(sd_frame)
-        srow.pack(fill=tk.X, pady=2)
-        ttk.Label(srow, text="Search by ID:", width=20).pack(side=tk.LEFT)
-        self.search_id_entry = tk.Entry(srow)
-        self.search_id_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        ttk.Button(srow, text="Search", command=self.search_by_id).pack(side=tk.LEFT, padx=4)
+        # ---------- Right pane: forms and controls ----------
+        right_frame = ttk.Frame(self, padding=(8, 8))
+        right_frame.grid(row=0, column=2, sticky="nsew")
+        right_frame.columnconfigure(0, weight=1)
 
-        srow2 = ttk.Frame(sd_frame)
-        srow2.pack(fill=tk.X, pady=2)
-        ttk.Label(srow2, text="Search by Destination:", width=20).pack(side=tk.LEFT)
-        self.search_dest_entry = tk.Entry(srow2)
-        self.search_dest_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        ttk.Button(srow2, text="Search", command=self.search_by_destination).pack(side=tk.LEFT, padx=4)
+        # Add flight form (grid layout)
+        add_frame = ttk.LabelFrame(right_frame, text="Add Flight", padding=(8, 8))
+        add_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        for i in range(2):
+            add_frame.columnconfigure(i, weight=1)
+        ttk.Label(add_frame, text="Airline:").grid(row=0, column=0, sticky="e", padx=4, pady=4)
+        self.add_airline = ttk.Entry(add_frame)
+        self.add_airline.grid(row=0, column=1, sticky="ew", padx=4, pady=4)
 
-        del_frame = ttk.Frame(sd_frame)
-        del_frame.pack(fill=tk.X, pady=2)
-        ttk.Label(del_frame, text="Delete Flight ID:", width=20).pack(side=tk.LEFT)
-        self.delete_id_entry = tk.Entry(del_frame)
-        self.delete_id_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        ttk.Button(del_frame, text="Delete", command=self.delete_flight).pack(side=tk.LEFT, padx=4)
+        ttk.Label(add_frame, text="Source:").grid(row=1, column=0, sticky="e", padx=4, pady=4)
+        self.add_source = ttk.Entry(add_frame)
+        self.add_source.grid(row=1, column=1, sticky="ew", padx=4, pady=4)
+
+        ttk.Label(add_frame, text="Destination:").grid(row=2, column=0, sticky="e", padx=4, pady=4)
+        self.add_dest = ttk.Entry(add_frame)
+        self.add_dest.grid(row=2, column=1, sticky="ew", padx=4, pady=4)
+
+        ttk.Label(add_frame, text="Departure (HH:MM):").grid(row=3, column=0, sticky="e", padx=4, pady=4)
+        self.add_dep = ttk.Entry(add_frame)
+        self.add_dep.grid(row=3, column=1, sticky="ew", padx=4, pady=4)
+
+        ttk.Label(add_frame, text="Arrival (HH:MM):").grid(row=4, column=0, sticky="e", padx=4, pady=4)
+        self.add_arr = ttk.Entry(add_frame)
+        self.add_arr.grid(row=4, column=1, sticky="ew", padx=4, pady=4)
+
+        ttk.Button(add_frame, text="Add Flight", command=self.add_flight).grid(row=5, column=0, columnspan=2, pady=6, sticky="ew")
+
+        # Search & Delete condensed frame
+        sd_frame = ttk.LabelFrame(right_frame, text="Search / Delete", padding=(8, 8))
+        sd_frame.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        sd_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(sd_frame, text="Search by ID:").grid(row=0, column=0, sticky="e", padx=4, pady=4)
+        self.search_id_entry = ttk.Entry(sd_frame)
+        self.search_id_entry.grid(row=0, column=1, sticky="ew", padx=4, pady=4)
+        ttk.Button(sd_frame, text="Search", command=self.search_by_id).grid(row=0, column=2, padx=4)
+
+        ttk.Label(sd_frame, text="Search by Destination:").grid(row=1, column=0, sticky="e", padx=4, pady=4)
+        self.search_dest_entry = ttk.Entry(sd_frame)
+        self.search_dest_entry.grid(row=1, column=1, sticky="ew", padx=4, pady=4)
+        ttk.Button(sd_frame, text="Search", command=self.search_by_destination).grid(row=1, column=2, padx=4)
+
+        ttk.Label(sd_frame, text="Delete Flight ID:").grid(row=2, column=0, sticky="e", padx=4, pady=4)
+        self.delete_id_entry = ttk.Entry(sd_frame)
+        self.delete_id_entry.grid(row=2, column=1, sticky="ew", padx=4, pady=4)
+        ttk.Button(sd_frame, text="Delete", command=self.delete_flight).grid(row=2, column=2, padx=4)
 
         # Stack and Queue
-        sq_frame = ttk.LabelFrame(right, text="Emergency Stack & Boarding Queue")
-        sq_frame.pack(fill=tk.BOTH, expand=True, pady=4)
+        sq_frame = ttk.LabelFrame(right_frame, text="Emergency Stack & Boarding Queue", padding=(8, 8))
+        sq_frame.grid(row=2, column=0, sticky="ew", pady=(0, 8))
+        sq_frame.columnconfigure((0, 1, 2), weight=1)
 
-        # emergency stack
-        es = ttk.Frame(sq_frame)
-        es.pack(fill=tk.X, pady=2)
-        ttk.Label(es, text="Emergency Flight ID:").pack(side=tk.LEFT)
-        self.es_entry = tk.Entry(es, width=8)
-        self.es_entry.pack(side=tk.LEFT, padx=4)
-        ttk.Button(es, text="Push", command=self.push_emergency).pack(side=tk.LEFT, padx=2)
-        ttk.Button(es, text="Pop", command=self.pop_emergency).pack(side=tk.LEFT, padx=2)
-        ttk.Button(es, text="Show Stack", command=self.show_stack).pack(side=tk.LEFT, padx=4)
+        # Emergency stack
+        ttk.Label(sq_frame, text="Emergency Flight ID:").grid(row=0, column=0, sticky="e", padx=4, pady=4)
+        self.es_entry = ttk.Entry(sq_frame, width=8)
+        self.es_entry.grid(row=0, column=1, sticky="w", padx=4, pady=4)
+        stack_btn_frame = ttk.Frame(sq_frame)
+        stack_btn_frame.grid(row=0, column=2, sticky="e")
+        ttk.Button(stack_btn_frame, text="Push", command=self.push_emergency).pack(side="left", padx=2)
+        ttk.Button(stack_btn_frame, text="Pop", command=self.pop_emergency).pack(side="left", padx=2)
+        ttk.Button(stack_btn_frame, text="Show Stack", command=self.show_stack).pack(side="left", padx=2)
 
-        # boarding queue
-        bq = ttk.Frame(sq_frame)
-        bq.pack(fill=tk.X, pady=2)
-        ttk.Label(bq, text="Boarding Flight ID:").pack(side=tk.LEFT)
-        self.bq_entry = tk.Entry(bq, width=8)
-        self.bq_entry.pack(side=tk.LEFT, padx=4)
-        ttk.Button(bq, text="Enqueue", command=self.enqueue_boarding).pack(side=tk.LEFT, padx=2)
-        ttk.Button(bq, text="Dequeue", command=self.dequeue_boarding).pack(side=tk.LEFT, padx=2)
-        ttk.Button(bq, text="Show Queue", command=self.show_queue).pack(side=tk.LEFT, padx=4)
+        # Boarding queue
+        ttk.Label(sq_frame, text="Boarding Flight ID:").grid(row=1, column=0, sticky="e", padx=4, pady=4)
+        self.bq_entry = ttk.Entry(sq_frame, width=8)
+        self.bq_entry.grid(row=1, column=1, sticky="w", padx=4, pady=4)
+        queue_btn_frame = ttk.Frame(sq_frame)
+        queue_btn_frame.grid(row=1, column=2, sticky="e")
+        ttk.Button(queue_btn_frame, text="Enqueue", command=self.enqueue_boarding).pack(side="left", padx=2)
+        ttk.Button(queue_btn_frame, text="Dequeue", command=self.dequeue_boarding).pack(side="left", padx=2)
+        ttk.Button(queue_btn_frame, text="Show Queue", command=self.show_queue).pack(side="left", padx=2)
 
         # Itinerary finder
-        itin_frame = ttk.LabelFrame(right, text="Find Itinerary (BFS Graph)")
-        itin_frame.pack(fill=tk.X, pady=4)
-        row1 = ttk.Frame(itin_frame); row1.pack(fill=tk.X, pady=2)
-        ttk.Label(row1, text="Source:", width=10).pack(side=tk.LEFT)
-        self.itin_src = tk.Entry(row1); self.itin_src.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
-        ttk.Label(row1, text="Destination:", width=10).pack(side=tk.LEFT)
-        self.itin_dst = tk.Entry(row1); self.itin_dst.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
-        row2 = ttk.Frame(itin_frame); row2.pack(fill=tk.X, pady=2)
-        ttk.Label(row2, text="Max Stops (0=direct):", width=20).pack(side=tk.LEFT)
-        self.itin_stops = tk.Entry(row2, width=6); self.itin_stops.pack(side=tk.LEFT)
-        ttk.Button(itin_frame, text="Find Itinerary", command=self.find_itinerary).pack(pady=6)
+        itin_frame = ttk.LabelFrame(right_frame, text="Find Itinerary (BFS Graph)", padding=(8, 8))
+        itin_frame.grid(row=3, column=0, sticky="ew", pady=(0, 8))
+        itin_frame.columnconfigure((1, 3), weight=1)
 
-        # Output / Logs
-        out_frame = ttk.LabelFrame(self, text="Output")
-        out_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True, padx=8, pady=8)
-        self.output_text = tk.Text(out_frame, height=12)
-        self.output_text.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(itin_frame, text="Source:").grid(row=0, column=0, sticky="e", padx=4, pady=4)
+        self.itin_src = ttk.Entry(itin_frame)
+        self.itin_src.grid(row=0, column=1, sticky="ew", padx=4, pady=4)
+
+        ttk.Label(itin_frame, text="Destination:").grid(row=0, column=2, sticky="e", padx=4, pady=4)
+        self.itin_dst = ttk.Entry(itin_frame)
+        self.itin_dst.grid(row=0, column=3, sticky="ew", padx=4, pady=4)
+
+        ttk.Label(itin_frame, text="Max Stops:").grid(row=1, column=0, sticky="e", padx=4, pady=4)
+        self.itin_stops = ttk.Entry(itin_frame, width=6)
+        self.itin_stops.grid(row=1, column=1, sticky="w", padx=4, pady=4)
+        ttk.Button(itin_frame, text="Find Itinerary", command=self.find_itinerary).grid(row=1, column=3, sticky="e", padx=4, pady=4)
+
+        # ---------- Bottom pane: Output / Logs ----------
+        out_frame = ttk.LabelFrame(self, text="Output & Logs", padding=(8, 8))
+        out_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=8, pady=(0, 8))
+        out_frame.columnconfigure(0, weight=1)
+        out_frame.rowconfigure(0, weight=1)
+        self.output_text = tk.Text(out_frame, height=10, wrap="word")
+        self.output_text.grid(row=0, column=0, sticky="nsew")
+        # add a vertical scrollbar
+        scrollbar = ttk.Scrollbar(out_frame, command=self.output_text.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self.output_text["yscrollcommand"] = scrollbar.set
 
     # -------------------------
     # GUI action methods
     # -------------------------
     def refresh_all_lists(self):
-        self.flight_listbox.delete(0, tk.END)
+        # Clear tree
+        for iid in self.flight_tree.get_children():
+            self.flight_tree.delete(iid)
+        # Populate with current flights
         for f in fm.list_all():
-            self.flight_listbox.insert(tk.END, self.format_flight_short(f))
+            # Use flight.id as iid for easy lookup
+            self.flight_tree.insert("", "end", iid=str(f.id), values=(f.id, f.airline, f.source, f.destination, f.departure, f.arrival))
         self.log("Refreshed flight list.")
 
-    @staticmethod
-    def format_flight_short(f: Flight) -> str:
-        return f"{f.id}: {f.airline} | {f.source} -> {f.destination} | {f.departure}-{f.arrival}"
-
     def on_flight_select(self, event):
-        sel = self.flight_listbox.curselection()
+        sel = self.flight_tree.selection()
         if not sel:
             return
-        idx = sel[0]
-        f = fm.list_all()[idx]
-        self.log(f"Selected Flight: {self.format_flight_short(f)}")
+        iid = sel[0]
+        try:
+            fid = int(iid)
+        except ValueError:
+            return
+        f = fm.search_by_id(fid)
+        if f:
+            self.log(f"Selected Flight: {fid} | {f.airline} | {f.source} -> {f.destination} | {f.departure}-{f.arrival}")
 
     def add_flight(self):
         a = self.add_airline.get().strip()
@@ -196,7 +225,7 @@ class FlightApp(tk.Tk):
             return
         f = fm.search_by_id(fid)
         if f:
-            self.log(f"Found: {self.format_flight_short(f)}")
+            self.log(f"Found: {fid} | {f.airline} | {f.source} -> {f.destination} | {f.departure}-{f.arrival}")
         else:
             self.log(f"No flight with ID {fid} found.")
 
@@ -208,7 +237,7 @@ class FlightApp(tk.Tk):
         if res:
             self.log(f"{len(res)} flight(s) to {dest}:")
             for f in res:
-                self.log(self.format_flight_short(f))
+                self.log(f"{f.id} | {f.airline} | {f.source} -> {f.destination} | {f.departure}-{f.arrival}")
         else:
             self.log(f"No flights found to {dest}.")
 
@@ -275,7 +304,8 @@ class FlightApp(tk.Tk):
         if fid is None:
             self.log("Boarding queue empty.")
         else:
-            self.log(f"Dequeued flight {fid} (boarded).")
+            self.log(f"Flight {fid} has boarded and was removed from the schedule.")
+            self.refresh_all_lists()
 
     def show_queue(self):
         arr = fm.list_boarding_queue()
@@ -294,12 +324,7 @@ class FlightApp(tk.Tk):
             return
         self.log("Flights sorted by ID (inorder BST):")
         for f in arr:
-            self.log(self.format_flight_short(f))
-
-    def rebuild_indices(self):
-        fm.rebuild()
-        self.log("Rebuilt tree index and graph from current flights.")
-        self.refresh_all_lists()
+            self.log(f"{f.id} | {f.airline} | {f.source} -> {f.destination} | {f.departure}-{f.arrival}")
 
     # Itinerary finder
     def find_itinerary(self):
