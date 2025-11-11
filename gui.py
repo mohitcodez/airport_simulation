@@ -1,6 +1,6 @@
 # gui.py
-# Improved alignment and layout using ttk.Treeview and grid geometry.
-# The GUI still uses model.FlightManager (fm) for data operations.
+# Updated: "Show Sorted (Tree)" now sorts flights by flight time (shortest duration first).
+# Uses model.FlightManager (fm) for data operations. Includes time parsing/formatting and duration calc.
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -8,6 +8,88 @@ from model import FlightManager, Flight
 
 # Single FlightManager instance used by the GUI
 fm = FlightManager()
+
+
+def format_time(timestr: str) -> str:
+    """Format time strings to HH:MM.
+    Accepts '1300', '0800', '13:00', '8:00', '800' etc and returns '13:00' or '' for empty.
+    """
+    if not timestr:
+        return ""
+    s = timestr.strip()
+    if ":" in s:
+        # Normalize H:MM or HH:MM -> zero-pad hour and minute if needed
+        parts = s.split(":")
+        if len(parts) != 2:
+            return s
+        h = parts[0].zfill(2)
+        m = parts[1].zfill(2)
+        return f"{h}:{m}"
+    # remove any non-digit
+    digits = "".join(ch for ch in s if ch.isdigit())
+    if not digits:
+        return s
+    if len(digits) <= 2:
+        # interpret as hour only
+        h = digits.zfill(2)
+        return f"{h}:00"
+    # last two digits are minutes
+    hh = digits[:-2].zfill(2)
+    mm = digits[-2:].zfill(2)
+    return f"{hh}:{mm}"
+
+
+def parse_time_to_minutes(timestr: str) -> int:
+    """Return minutes from midnight for a HH:MM string. If invalid, return -1."""
+    s = format_time(timestr)
+    if not s:
+        return -1
+    parts = s.split(":")
+    if len(parts) != 2:
+        return -1
+    try:
+        h = int(parts[0])
+        m = int(parts[1])
+    except ValueError:
+        return -1
+    if not (0 <= h < 24 and 0 <= m < 60):
+        return -1
+    return h * 60 + m
+
+
+def duration_minutes(dep: str, arr: str) -> int:
+    """
+    Compute flight duration in minutes from dep to arr.
+    If arrival is earlier than departure, assume arrival is next day.
+    Returns duration in minutes, or a large number (e.g., 24*60*100) if either time invalid.
+    """
+    d = parse_time_to_minutes(dep)
+    a = parse_time_to_minutes(arr)
+    if d < 0 or a < 0:
+        return 24 * 60 * 100  # treat invalid as very long so they sort at the end
+    if a < d:
+        # arrival next day
+        a += 24 * 60
+    return a - d
+
+
+class HighlightEntry(tk.Entry):
+    """A tk.Entry subclass that highlights itself slightly when focused."""
+
+    def __init__(self, master=None, highlight_bg="#fff9c4", normal_bg="white", **kwargs):
+        super().__init__(master, bg=normal_bg, **kwargs)
+        self.normal_bg = normal_bg
+        self.highlight_bg = highlight_bg
+        # add a light border to make it visible
+        self.config(relief="solid", bd=1, highlightthickness=0)
+        self.bind("<FocusIn>", self.on_focus_in)
+        self.bind("<FocusOut>", self.on_focus_out)
+
+    def on_focus_in(self, _event=None):
+        self.configure(bg=self.highlight_bg)
+
+    def on_focus_out(self, _event=None):
+        self.configure(bg=self.normal_bg)
 
 
 class FlightApp(tk.Tk):
@@ -33,7 +115,7 @@ class FlightApp(tk.Tk):
         lbl = ttk.Label(left_frame, text="All Flights", font=("Segoe UI", 11, "bold"))
         lbl.grid(row=0, column=0, sticky="w")
 
-        # Treeview for flights (better alignment than Listbox)
+        # Treeview for flights (with formatted time columns)
         columns = ("id", "airline", "source", "destination", "departure", "arrival")
         self.flight_tree = ttk.Treeview(left_frame, columns=columns, show="headings", selectmode="browse", height=20)
         self.flight_tree.grid(row=1, column=0, sticky="nsew", pady=(6, 6))
@@ -42,15 +124,15 @@ class FlightApp(tk.Tk):
         self.flight_tree.heading("airline", text="Airline")
         self.flight_tree.heading("source", text="Source")
         self.flight_tree.heading("destination", text="Destination")
-        self.flight_tree.heading("departure", text="Dep")
-        self.flight_tree.heading("arrival", text="Arr")
+        self.flight_tree.heading("departure", text="Dep (HH:MM)")
+        self.flight_tree.heading("arrival", text="Arr (HH:MM)")
         # Column widths
         self.flight_tree.column("id", width=60, anchor="center")
-        self.flight_tree.column("airline", width=140, anchor="w")
+        self.flight_tree.column("airline", width=160, anchor="w")
         self.flight_tree.column("source", width=100, anchor="w")
         self.flight_tree.column("destination", width=100, anchor="w")
-        self.flight_tree.column("departure", width=70, anchor="center")
-        self.flight_tree.column("arrival", width=70, anchor="center")
+        self.flight_tree.column("departure", width=80, anchor="center")
+        self.flight_tree.column("arrival", width=80, anchor="center")
         self.flight_tree.bind("<<TreeviewSelect>>", self.on_flight_select)
 
         # Left frame configuration
@@ -76,23 +158,23 @@ class FlightApp(tk.Tk):
         for i in range(2):
             add_frame.columnconfigure(i, weight=1)
         ttk.Label(add_frame, text="Airline:").grid(row=0, column=0, sticky="e", padx=4, pady=4)
-        self.add_airline = ttk.Entry(add_frame)
+        self.add_airline = HighlightEntry(add_frame)
         self.add_airline.grid(row=0, column=1, sticky="ew", padx=4, pady=4)
 
         ttk.Label(add_frame, text="Source:").grid(row=1, column=0, sticky="e", padx=4, pady=4)
-        self.add_source = ttk.Entry(add_frame)
+        self.add_source = HighlightEntry(add_frame)
         self.add_source.grid(row=1, column=1, sticky="ew", padx=4, pady=4)
 
         ttk.Label(add_frame, text="Destination:").grid(row=2, column=0, sticky="e", padx=4, pady=4)
-        self.add_dest = ttk.Entry(add_frame)
+        self.add_dest = HighlightEntry(add_frame)
         self.add_dest.grid(row=2, column=1, sticky="ew", padx=4, pady=4)
 
         ttk.Label(add_frame, text="Departure (HH:MM):").grid(row=3, column=0, sticky="e", padx=4, pady=4)
-        self.add_dep = ttk.Entry(add_frame)
+        self.add_dep = HighlightEntry(add_frame)
         self.add_dep.grid(row=3, column=1, sticky="ew", padx=4, pady=4)
 
         ttk.Label(add_frame, text="Arrival (HH:MM):").grid(row=4, column=0, sticky="e", padx=4, pady=4)
-        self.add_arr = ttk.Entry(add_frame)
+        self.add_arr = HighlightEntry(add_frame)
         self.add_arr.grid(row=4, column=1, sticky="ew", padx=4, pady=4)
 
         ttk.Button(add_frame, text="Add Flight", command=self.add_flight).grid(row=5, column=0, columnspan=2, pady=6, sticky="ew")
@@ -103,17 +185,17 @@ class FlightApp(tk.Tk):
         sd_frame.columnconfigure(1, weight=1)
 
         ttk.Label(sd_frame, text="Search by ID:").grid(row=0, column=0, sticky="e", padx=4, pady=4)
-        self.search_id_entry = ttk.Entry(sd_frame)
+        self.search_id_entry = HighlightEntry(sd_frame)
         self.search_id_entry.grid(row=0, column=1, sticky="ew", padx=4, pady=4)
         ttk.Button(sd_frame, text="Search", command=self.search_by_id).grid(row=0, column=2, padx=4)
 
         ttk.Label(sd_frame, text="Search by Destination:").grid(row=1, column=0, sticky="e", padx=4, pady=4)
-        self.search_dest_entry = ttk.Entry(sd_frame)
+        self.search_dest_entry = HighlightEntry(sd_frame)
         self.search_dest_entry.grid(row=1, column=1, sticky="ew", padx=4, pady=4)
         ttk.Button(sd_frame, text="Search", command=self.search_by_destination).grid(row=1, column=2, padx=4)
 
         ttk.Label(sd_frame, text="Delete Flight ID:").grid(row=2, column=0, sticky="e", padx=4, pady=4)
-        self.delete_id_entry = ttk.Entry(sd_frame)
+        self.delete_id_entry = HighlightEntry(sd_frame)
         self.delete_id_entry.grid(row=2, column=1, sticky="ew", padx=4, pady=4)
         ttk.Button(sd_frame, text="Delete", command=self.delete_flight).grid(row=2, column=2, padx=4)
 
@@ -124,7 +206,7 @@ class FlightApp(tk.Tk):
 
         # Emergency stack
         ttk.Label(sq_frame, text="Emergency Flight ID:").grid(row=0, column=0, sticky="e", padx=4, pady=4)
-        self.es_entry = ttk.Entry(sq_frame, width=8)
+        self.es_entry = HighlightEntry(sq_frame, width=8)
         self.es_entry.grid(row=0, column=1, sticky="w", padx=4, pady=4)
         stack_btn_frame = ttk.Frame(sq_frame)
         stack_btn_frame.grid(row=0, column=2, sticky="e")
@@ -134,7 +216,7 @@ class FlightApp(tk.Tk):
 
         # Boarding queue
         ttk.Label(sq_frame, text="Boarding Flight ID:").grid(row=1, column=0, sticky="e", padx=4, pady=4)
-        self.bq_entry = ttk.Entry(sq_frame, width=8)
+        self.bq_entry = HighlightEntry(sq_frame, width=8)
         self.bq_entry.grid(row=1, column=1, sticky="w", padx=4, pady=4)
         queue_btn_frame = ttk.Frame(sq_frame)
         queue_btn_frame.grid(row=1, column=2, sticky="e")
@@ -148,15 +230,15 @@ class FlightApp(tk.Tk):
         itin_frame.columnconfigure((1, 3), weight=1)
 
         ttk.Label(itin_frame, text="Source:").grid(row=0, column=0, sticky="e", padx=4, pady=4)
-        self.itin_src = ttk.Entry(itin_frame)
+        self.itin_src = HighlightEntry(itin_frame)
         self.itin_src.grid(row=0, column=1, sticky="ew", padx=4, pady=4)
 
         ttk.Label(itin_frame, text="Destination:").grid(row=0, column=2, sticky="e", padx=4, pady=4)
-        self.itin_dst = ttk.Entry(itin_frame)
+        self.itin_dst = HighlightEntry(itin_frame)
         self.itin_dst.grid(row=0, column=3, sticky="ew", padx=4, pady=4)
 
         ttk.Label(itin_frame, text="Max Stops:").grid(row=1, column=0, sticky="e", padx=4, pady=4)
-        self.itin_stops = ttk.Entry(itin_frame, width=6)
+        self.itin_stops = HighlightEntry(itin_frame, width=6)
         self.itin_stops.grid(row=1, column=1, sticky="w", padx=4, pady=4)
         ttk.Button(itin_frame, text="Find Itinerary", command=self.find_itinerary).grid(row=1, column=3, sticky="e", padx=4, pady=4)
 
@@ -179,10 +261,12 @@ class FlightApp(tk.Tk):
         # Clear tree
         for iid in self.flight_tree.get_children():
             self.flight_tree.delete(iid)
-        # Populate with current flights
+        # Populate with current flights (format times)
         for f in fm.list_all():
+            dep = format_time(f.departure)
+            arr = format_time(f.arrival)
             # Use flight.id as iid for easy lookup
-            self.flight_tree.insert("", "end", iid=str(f.id), values=(f.id, f.airline, f.source, f.destination, f.departure, f.arrival))
+            self.flight_tree.insert("", "end", iid=str(f.id), values=(f.id, f.airline, f.source, f.destination, dep, arr))
         self.log("Refreshed flight list.")
 
     def on_flight_select(self, event):
@@ -196,7 +280,7 @@ class FlightApp(tk.Tk):
             return
         f = fm.search_by_id(fid)
         if f:
-            self.log(f"Selected Flight: {fid} | {f.airline} | {f.source} -> {f.destination} | {f.departure}-{f.arrival}")
+            self.log(f"Selected Flight: {fid} | {f.airline} | {f.source} -> {f.destination} | {format_time(f.departure)}-{format_time(f.arrival)}")
 
     def add_flight(self):
         a = self.add_airline.get().strip()
@@ -225,7 +309,7 @@ class FlightApp(tk.Tk):
             return
         f = fm.search_by_id(fid)
         if f:
-            self.log(f"Found: {fid} | {f.airline} | {f.source} -> {f.destination} | {f.departure}-{f.arrival}")
+            self.log(f"Found: {fid} | {f.airline} | {f.source} -> {f.destination} | {format_time(f.departure)}-{format_time(f.arrival)}")
         else:
             self.log(f"No flight with ID {fid} found.")
 
@@ -237,7 +321,7 @@ class FlightApp(tk.Tk):
         if res:
             self.log(f"{len(res)} flight(s) to {dest}:")
             for f in res:
-                self.log(f"{f.id} | {f.airline} | {f.source} -> {f.destination} | {f.departure}-{f.arrival}")
+                self.log(f"{f.id} | {f.airline} | {f.source} -> {f.destination} | {format_time(f.departure)}-{format_time(f.arrival)}")
         else:
             self.log(f"No flights found to {dest}.")
 
@@ -316,15 +400,28 @@ class FlightApp(tk.Tk):
         for fid in arr:
             self.log(f"- Flight ID {fid}")
 
-    # Tree / sorted
+    # Tree / sorted: now sorts by flight duration (shortest first)
     def show_sorted(self):
-        arr = fm.inorder_traverse()
-        if not arr:
+        flights = fm.list_all()
+        if not flights:
             self.log("No flights to show (sorted).")
             return
-        self.log("Flights sorted by ID (inorder BST):")
-        for f in arr:
-            self.log(f"{f.id} | {f.airline} | {f.source} -> {f.destination} | {f.departure}-{f.arrival}")
+        # Compute duration for each flight (in minutes) and sort ascending
+        flights_with_dur = []
+        for f in flights:
+            dur = duration_minutes(f.departure, f.arrival)
+            flights_with_dur.append((dur, f))
+        flights_with_dur.sort(key=lambda x: x[0])
+        self.log("Flights sorted by duration (shortest first):")
+        for dur, f in flights_with_dur:
+            # format duration as H:MM or M min
+            if dur >= 24 * 60 * 50:
+                dur_str = "N/A"
+            else:
+                hours = dur // 60
+                mins = dur % 60
+                dur_str = f"{hours:d}h {mins:02d}m" if hours > 0 else f"{mins}m"
+            self.log(f"{f.id} | {f.airline} | {f.source} -> {f.destination} | {format_time(f.departure)} - {format_time(f.arrival)} | Dur: {dur_str}")
 
     # Itinerary finder
     def find_itinerary(self):
@@ -343,7 +440,7 @@ class FlightApp(tk.Tk):
             return
         self.log(f"Itinerary from {src} to {dst} ({len(legs)} legs):")
         for i, leg in enumerate(legs, start=1):
-            self.log(f"Leg {i}: {leg.id} | {leg.source} -> {leg.destination} | {leg.airline} | {leg.departure}-{leg.arrival}")
+            self.log(f"Leg {i}: {leg.id} | {leg.source} -> {leg.destination} | {leg.airline} | {format_time(leg.departure)}-{format_time(leg.arrival)}")
 
     # Logging helper
     def log(self, text: str):

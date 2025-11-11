@@ -1,3 +1,4 @@
 1,flying emirates,goa,kerela,1300,0800
 2,indigo,goa,rajasthan,1200,0100
-3,indian airline,rajasthan,nepal,1200,0100
+3,indigo,rajasthan,nepal,02:00,10:00
+4,airlines,dehradun,goa,12:00,01:12
